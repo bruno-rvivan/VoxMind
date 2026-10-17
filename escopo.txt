@@ -1,0 +1,517 @@
+Eloquence AI — Planejamento técnico do projeto
+Vamos estruturar o Eloquence AI como um produto de verdade, não apenas como uma demonstração de IA. A ideia é construir uma aplicação web capaz de receber vídeos, processá-los por diferentes ferramentas de análise e entregar um relatório útil para quem deseja melhorar a própria oratória.
+Como você já trabalha com Python, FastAPI, SQLAlchemy e agentes de IA, eu planejaria o projeto para aproveitar essas tecnologias e, ao mesmo tempo, introduzir ferramentas novas de forma gradual.
+O princípio mais importante será: cada tecnologia terá uma função clara, e a IA não fará sozinha todo o trabalho. Vamos combinar processamento de mídia, métricas objetivas, modelos especializados e um agente que sintetiza os resultados.
+1. Arquitetura geral
+Frontend — Eloquence AI
+Dashboard · Upload · Progresso · Relatórios · Histórico
+
+HTTPS / REST API
+
+Backend — FastAPI
+Autenticação, usuários, vídeos, análises e relatórios
+
+
+
+PostgreSQL
+Usuários, análises, métricas e histórico
+
+
+Redis + worker
+Fila e execução de tarefas demoradas
+
+
+
+
+Pipeline de análise multimodal
+Áudio
+Ritmo, pausas, fluidez, entonação
+
+
+Linguagem
+Transcrição, clareza, repetição, vocabulário
+
+
+Vídeo
+Postura visível, enquadramento, movimentos
+
+
+Síntese com IA
+Relatório, recomendações e exercícios
+
+
+
+
+
+Relatório final
+Indicadores explicáveis · Exemplos da fala · Pontos fortes · Plano de melhoria
+
+
+Essa arquitetura separa a interface, a lógica de negócio e o processamento pesado. Assim, um vídeo de vários minutos não precisa ser analisado dentro de uma única requisição HTTP, que poderia expirar antes de terminar.
+2. Páginas do site
+Eu dividiria a aplicação em uma área pública e um painel privado, com navegação simples e visual de produto SaaS.
+
+
+
+
+
+
+
+
+
+01. Landing page — /
+Apresentação do Eloquence AI, benefícios, funcionamento, recursos e botão para experimentar. É a página que apresenta o produto a recrutadores e usuários.
+
+
+
+
+
+
+
+
+
+
+
+
+02. Autenticação — /login e /register
+Cadastro, login, logout e recuperação de senha. Cada pessoa terá acesso somente aos próprios vídeos e relatórios.
+
+
+
+
+
+
+
+
+
+
+
+
+03. Dashboard — /dashboard
+Visão geral com botão de nova análise, análises recentes, status dos processamentos e evolução dos indicadores ao longo do tempo.
+
+
+
+
+
+
+
+
+
+
+
+
+04. Nova análise — /analyses/new
+Upload do vídeo, título, idioma, contexto da apresentação e objetivo da análise. Mostra as condições e limitações da avaliação antes do envio.
+
+
+
+
+
+
+
+
+
+
+
+
+05. Relatório — /analyses/{id}
+Página principal do produto. Apresenta notas ou indicadores, gráficos, trechos da transcrição com timestamps, pontos fortes e recomendações específicas.
+
+
+
+
+
+
+
+
+
+
+
+
+06. Histórico — /analyses
+Lista de análises anteriores, filtros por data e status, acesso aos relatórios e opção de excluir os dados.
+
+
+
+
+
+
+
+
+
+
+
+07. Configurações — /settings
+Dados da conta, preferências, gerenciamento de vídeos e relatórios, exclusão de conta e controles de privacidade.
+
+
+
+Para a primeira versão, eu implementaria as sete rotas, mas deixaria landing page, autenticação, dashboard, upload, relatório e histórico como prioridades. Recuperação de senha e recursos mais avançados podem entrar depois.
+3. Tecnologias recomendadas
+Minha escolha seria um stack Python-first, com ferramentas que tenham utilidade real no projeto e que sejam boas para apresentar em entrevistas.
+Camada	Tecnologia	Função
+Frontend	React + TypeScript + Vite	Interface, páginas e componentes
+Estilização	Tailwind CSS	Layout responsivo e identidade visual
+Gráficos	Recharts	Visualização dos indicadores
+Backend	FastAPI	API e regras de negócio
+Validação	Pydantic	Validar entradas e saídas da API
+ORM	SQLAlchemy 2.x	Comunicação com o banco
+Migrações	Alembic	Versionamento do esquema do banco
+Banco	PostgreSQL	Persistência dos dados
+Fila	Redis + Celery	Processamento assíncrono
+Vídeo e áudio	FFmpeg	Extrair áudio, duração e quadros
+Análise de áudio	librosa + openSMILE	Métricas acústicas e características vocais
+Transcrição	Whisper ou API de transcrição	Converter fala em texto com timestamps
+Análise visual	OpenCV + MediaPipe	Quadros, landmarks e estimativas de postura
+Inteligência artificial	API de modelo multimodal	Interpretar evidências e produzir feedback
+Testes	pytest + HTTPX	Testes unitários e da API
+Infraestrutura local	Docker Compose	Executar serviços de desenvolvimento
+Por que React em vez de Streamlit? Porque este é um projeto de portfólio com objetivo de demonstrar desenvolvimento de produto. React permite separar o frontend do backend, criar uma experiência mais refinada e mostrar que você sabe construir uma aplicação web completa. Se quiser reduzir a curva de aprendizado, pode começar com templates HTML e Jinja2 no próprio FastAPI, mas eu seguiria com React para este projeto.
+Não é necessário instalar e dominar tudo no primeiro dia. Vamos construir por etapas.
+4. Como funcionará o motor de análise
+O coração do Eloquence AI será um pipeline de processamento. Cada etapa deve gerar resultados estruturados, que poderão ser salvos, testados e analisados separadamente.
+
+Etapa 1 — Receber e validar o vídeo
+Validar extensão, tamanho, duração e formato real do arquivo. Armazenar o vídeo em storage privado e criar um registro de análise com status queued.
+
+
+
+
+Etapa 2 — Extrair e analisar o áudio
+Usar FFmpeg para extrair a faixa de áudio. Calcular duração da fala, pausas, velocidade aproximada, distribuição de energia e características de entonação.
+Resultado: métricas acústicas e dados temporais.
+
+
+
+
+Etapa 3 — Transcrever e analisar a linguagem
+Gerar transcrição com timestamps, identificar palavras de preenchimento, repetições, tamanho das frases, vocabulário e organização das ideias.
+Resultado: transcrição e indicadores linguísticos.
+
+
+
+
+Etapa 4 — Analisar os elementos visuais
+Amostrar quadros em intervalos controlados e extrair landmarks corporais e faciais quando houver condições adequadas. Avaliar postura observável, movimentos, estabilidade do enquadramento e direção aparente do olhar, sem presumir estados emocionais.
+Resultado: indicadores visuais com timestamps e limitações explícitas.
+
+
+
+
+Etapa 5 — Agente de síntese
+Receber as evidências estruturadas e gerar um relatório em formato JSON validado por Pydantic, com pontos fortes, oportunidades de melhoria, exemplos e exercícios.
+Resultado: feedback individualizado e fundamentado nas evidências disponíveis.
+
+
+
+
+Etapa 6 — Persistir e apresentar
+Salvar os resultados, atualizar o status para completed e disponibilizar o relatório no dashboard. Em caso de erro, registrar a falha e permitir uma nova tentativa controlada.
+
+
+
+Um detalhe importante sobre os agentes
+Eu usaria um único agente de síntese no MVP, não vários agentes autônomos desde o começo.
+O processamento de áudio, a transcrição e a extração visual devem ser etapas determinísticas ou executadas por ferramentas especializadas. O agente recebe os resultados dessas etapas e os transforma em feedback coerente.
+Depois, você pode experimentar Agno para criar um sistema multiagente, por exemplo:
+- Agente de oratória e voz.
+- Agente de linguagem e argumentação.
+- Agente de comunicação não verbal.
+- Agente coordenador que consolida os resultados.
+Isso vira uma evolução interessante do projeto, mas só quando a primeira versão estiver funcionando e você puder comparar a qualidade e o custo das duas arquiteturas.
+5. Estrutura de pastas do projeto
+Eu organizaria o repositório como um monorepo: frontend, backend, testes e infraestrutura no mesmo projeto, mas cada parte com responsabilidades claras.
+eloquence-ai/
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── assets/
+│   │   ├── components/
+│   │   │   ├── layout/
+│   │   │   ├── charts/
+│   │   │   ├── video/
+│   │   │   └── reports/
+│   │   ├── pages/
+│   │   │   ├── LandingPage.tsx
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── DashboardPage.tsx
+│   │   │   ├── UploadPage.tsx
+│   │   │   ├── AnalysisPage.tsx
+│   │   │   └── HistoryPage.tsx
+│   │   ├── services/
+│   │   │   └── api.ts
+│   │   ├── hooks/
+│   │   ├── types/
+│   │   └── App.tsx
+│   ├── package.json
+│   └── Dockerfile
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── core/
+│   │   │   ├── config.py
+│   │   │   ├── security.py
+│   │   │   └── logging.py
+│   │   ├── api/
+│   │   │   └── v1/
+│   │   │       ├── auth.py
+│   │   │       ├── users.py
+│   │   │       ├── analyses.py
+│   │   │       └── reports.py
+│   │   ├── models/
+│   │   ├── schemas/
+│   │   ├── repositories/
+│   │   ├── services/
+│   │   ├── workers/
+│   │   ├── pipelines/
+│   │   │   ├── audio.py
+│   │   │   ├── transcription.py
+│   │   │   ├── language.py
+│   │   │   ├── video.py
+│   │   │   └── synthesis.py
+│   │   └── db/
+│   │       ├── session.py
+│   │       └── base.py
+│   ├── migrations/
+│   ├── tests/
+│   ├── alembic.ini
+│   └── pyproject.toml
+│
+├── storage/                 # Arquivos locais de desenvolvimento
+├── docker-compose.yml
+├── .env.example
+├── .gitignore
+└── README.md
+
+
+A pasta storage/ deve ficar fora do controle de versão. Em produção, os vídeos devem ir para armazenamento privado, não para o sistema de arquivos temporário do container.
+Como dividir as responsabilidades:
+- api/: recebe as requisições HTTP e valida as entradas.
+- services/: implementa as regras de negócio, como criar e excluir análises.
+- repositories/: concentra consultas e operações de persistência.
+- pipelines/: implementa cada etapa técnica da análise.
+- workers/: executa o processamento assíncrono.
+- models/: define as entidades SQLAlchemy.
+- schemas/: define os contratos de entrada e saída Pydantic.
+Não precisamos criar todos esses arquivos vazios agora. Vamos abrir cada módulo quando sua responsabilidade entrar no desenvolvimento.
+6. Banco de dados
+Eu começaria com cinco entidades principais no PostgreSQL.
+users
+Conta e autenticação
+
+
+Campos: id, name, email, password_hash, created_at, updated_at.
+
+analyses
+Uma análise por vídeo enviado
+
+
+Campos: id, user_id, title, status, original_filename, storage_key, duration_seconds, language, analysis_goal, error_code, created_at, completed_at.
+
+transcripts
+Transcrição e segmentos temporais
+
+
+Campos: id, analysis_id, text, segments_json, language, provider, created_at.
+
+analysis_metrics
+Indicadores produzidos pelo pipeline
+
+
+Campos: id, analysis_id, category, metrics_json, created_at.
+
+reports
+Relatório consolidado
+
+
+Campos: id, analysis_id, overall_score, report_json, model_name, prompt_version, created_at.
+
+Relacionamentos
+users 1 ───── N analyses
+analyses 1 ── 0..1 transcripts
+analyses 1 ── N analysis_metrics
+analyses 1 ── 0..1 reports
+
+
+A regra central é que cada análise pertence a um usuário. Toda consulta, inclusive a consulta de um relatório por ID, deve verificar essa propriedade no backend.
+Algumas decisões de modelagem:
+- Use UUIDs como identificadores públicos.
+- Use JSONB para métricas e relatórios cuja estrutura possa evoluir.
+- Mantenha os dados centrais em colunas tipadas; não coloque todo o banco em JSON.
+- Crie índices para user_id, status e datas usadas nas listagens.
+- Use Alembic para versionar alterações no esquema.
+Os segmentos da transcrição devem ter início e fim em segundos. Assim, futuramente, o usuário poderá clicar em uma recomendação e ir diretamente ao trecho correspondente do vídeo.
+7. Contrato da API
+O frontend não deve conhecer detalhes internos dos modelos de IA. Ele conversa com o FastAPI por endpoints previsíveis.
+Método	Endpoint	Responsabilidade
+POST	/api/v1/auth/register	Criar conta
+POST	/api/v1/auth/login	Autenticar usuário
+POST	/api/v1/analyses	Criar análise e receber vídeo
+GET	/api/v1/analyses	Listar análises do usuário
+GET	/api/v1/analyses/{id}	Consultar status e metadados
+GET	/api/v1/analyses/{id}/report	Buscar relatório concluído
+POST	/api/v1/analyses/{id}/retry	Reprocessar uma análise elegível
+DELETE	/api/v1/analyses/{id}	Excluir análise e dados associados
+GET	/api/v1/users/me	Consultar perfil atual
+O upload pode começar como multipart/form-data. Mais tarde, se os vídeos ficarem grandes, o backend pode emitir uma URL temporária de upload direto para o storage privado.
+Para acompanhar o processamento, eu começaria com polling: o frontend consulta o status a cada poucos segundos enquanto a análise estiver ativa. WebSockets não são necessários no MVP.
+Estados de processamento
+queued
+  ↓
+processing
+  ├──→ completed
+  └──→ failed
+
+
+O worker precisa tratar falhas de maneira controlada, com tentativas limitadas, registro de erros e possibilidade de recuperação. Uma tarefa não deve gerar dois relatórios duplicados se for executada novamente.
+8. Como será o relatório
+O relatório precisa ser útil, e não apenas um texto genérico gerado por um LLM.
+Eu organizaria a página em cinco áreas:
+Visão geral
+Ritmo de fala
+142
+palavras/minuto
+
+
+Duração
+04:32
+tempo de apresentação
+
+
+
+Exemplo ilustrativo de interface; não representa uma análise real.
+
+Voz e fluidez
+Métricas de ritmo, pausas, variação de entonação e fluidez, acompanhadas de explicações sobre o que cada indicador significa.
+Linguagem e estrutura
+Trechos da transcrição, palavras de preenchimento, repetições e sugestões de reformulação.
+Comunicação visual
+Observações sobre postura e movimentação visíveis, com exemplos temporais e indicação de baixa confiança quando a imagem não permite uma avaliação adequada.
+Plano de evolução
+Três prioridades, exercícios práticos e metas para a próxima apresentação.
+
+Eu evitaria começar com uma nota geral arbitrária, como “sua oratória é 73/100”. Primeiro precisamos definir indicadores, escalas justificáveis e regras de cálculo. Se houver uma pontuação composta, ela deve ter critérios transparentes e ser apresentada como estimativa, não como medida científica universal.
+9. Segurança e privacidade
+Esse projeto lida com vídeos, rostos, vozes e transcrições. Segurança e privacidade devem fazer parte da arquitetura desde o início, não ser adicionadas somente quando o sistema estiver pronto.
+- Senhas: armazenar somente hashes seguros, usando uma biblioteca apropriada para hashing de senhas.
+- Autenticação: utilizar sessões seguras ou tokens com expiração e estratégia de renovação; proteger cookies com HttpOnly, Secure e SameSite quando aplicável.
+- Autorização: verificar a propriedade do recurso em todas as operações de leitura, exclusão e reprocessamento.
+- Upload: limitar tamanho e duração, validar o conteúdo real do arquivo e executar ferramentas de mídia com argumentos seguros.
+- Storage: manter vídeos privados, com acesso controlado e URLs temporárias quando necessário.
+- Segredos: armazenar chaves de API em variáveis de ambiente ou gerenciador de segredos, nunca no frontend ou no Git.
+- Exclusão: permitir que a pessoa exclua os vídeos, transcrições e relatórios, considerando também filas, arquivos temporários, backups e prazos de retenção.
+- Provedores externos: informar quando áudio, vídeo ou transcrições forem enviados a serviços de terceiros e verificar suas políticas de retenção e uso dos dados.
+- LGPD: implementar consentimento e transparência adequados, política de privacidade e controles compatíveis com os dados tratados.
+A análise de expressões faciais merece cuidado especial: o sistema deve descrever comportamentos observáveis, não inferir personalidade, honestidade ou estados psicológicos com falsa certeza.
+10. Infraestrutura e deploy
+Para não gastar tempo administrando servidores antes de ter um produto, eu dividiria a infraestrutura em duas fases.
+Desenvolvimento local
+Fase inicial
+- Frontend com Vite.
+- FastAPI com Uvicorn.
+- PostgreSQL e Redis via Docker Compose.
+- Worker Celery separado do backend.
+- Storage local para vídeos de teste.
+- Arquivo .env fora do Git.
+
+
+
+Produção
+Depois do MVP
+- Frontend estático em uma plataforma de hospedagem web.
+- Backend FastAPI em um serviço que suporte processos Python persistentes.
+- PostgreSQL gerenciado.
+- Redis gerenciado, ou alternativa compatível com a fila escolhida.
+- Object storage privado para vídeos.
+- Worker separado para análises.
+- Logs, monitoramento de falhas e limites de consumo das APIs de IA.
+
+
+
+Não recomendo começar pelo deploy. Primeiro precisamos ter um pipeline funcionando localmente, porque processamento de vídeo e áudio traz dependências externas, consumo de memória e falhas que são mais fáceis de depurar no ambiente de desenvolvimento.
+11. Plano de desenvolvimento
+Esta é a ordem que eu seguiria para você desenvolver o projeto, estudando cada componente em vez de apenas copiar código.
+01
+
+Fundação do projeto
+Criar o repositório, configurar o ambiente Python, Docker Compose, PostgreSQL, SQLAlchemy, Alembic e a estrutura básica do FastAPI.
+Entrega: API inicial conectada ao banco e primeira migração.
+
+
+
+02
+
+Usuários e persistência
+Implementar registro, login, autorização, modelos SQLAlchemy e operações de consulta e exclusão.
+Entrega: usuários podem acessar seus próprios dados com segurança.
+
+
+
+03
+
+Primeiro pipeline de mídia
+Receber um vídeo, validar o arquivo, extrair o áudio com FFmpeg e gerar uma transcrição com timestamps.
+Entrega: vídeo transformado em dados que podem ser analisados.
+
+
+
+04
+
+Métricas de oratória
+Calcular velocidade de fala, pausas, palavras de preenchimento e indicadores acústicos. Criar testes com amostras conhecidas.
+Entrega: métricas reais, sem depender exclusivamente de IA generativa.
+
+
+
+05
+
+Análise visual e síntese
+Implementar extração de quadros, indicadores visuais, integração com o modelo de IA e geração de relatórios estruturados.
+Entrega: o sistema combina evidências de áudio, linguagem e vídeo.
+
+
+
+06
+
+Fila de tarefas e resiliência
+Integrar Redis e Celery, acompanhar estados, tratar falhas, permitir novas tentativas e impedir duplicação de relatórios.
+Entrega: análises longas funcionam sem bloquear as requisições HTTP.
+
+
+
+07
+
+Interface completa
+Desenvolver dashboard, upload, progresso, relatório visual, histórico e configurações no React.
+Entrega: aplicação utilizável de ponta a ponta.
+
+
+
+08
+
+Qualidade e publicação
+Escrever testes, documentar endpoints, revisar segurança, medir custos e latência, configurar logs e fazer o deploy.
+Entrega: versão de portfólio demonstrável, documentada e reproduzível.
+
+
+
+12. O que precisa estar pronto para considerar o MVP concluído?
+Eu usaria estes critérios de aceitação:
+Checklist do MVP
+0 de 11
+
+
+
+[ ] O usuário consegue criar conta e entrar com segurança.
+[ ] É possível enviar um vídeo válido e rejeitar arquivos inválidos.
+[ ] O processamento ocorre em segundo plano, com status visível.
+[ ] A transcrição contém timestamps e pode ser consultada depois.
+[ ] O sistema calcula indicadores verificáveis de fala e linguagem.
+[ ] A análise visual registra somente observações suportadas pela imagem.
+[ ] O relatório reúne evidências, pontos fortes e recomendações específicas.
+[ ] Os resultados ficam salvos e aparecem no histórico.
+[ ] Falhas podem ser diagnosticadas e reprocessadas sem duplicação indevida.
+[ ] O usuário pode excluir seus dados e não consegue acessar análises de terceiros.
+[ ] Os testes automatizados, instruções de instalação e documentação estão disponíveis.

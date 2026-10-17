@@ -30,7 +30,6 @@ services:
   - type: web
     runtime: static
     name: voxmind-frontend
-    region: frankfurt
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist

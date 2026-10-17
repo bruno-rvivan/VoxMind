@@ -11,6 +11,14 @@ def get_storage_root() -> Path:
     return Path(configured_root) if configured_root else Path(__file__).resolve().parents[3] / "storage"
 
 
+def get_uploaded_file_path(storage_key: str) -> Path:
+    root = get_storage_root().resolve()
+    media_path = (root / storage_key).resolve()
+    if media_path == root or root not in media_path.parents:
+        raise ValueError("Caminho de arquivo inválido.")
+    return media_path
+
+
 def save_uploaded_file(file_obj: BinaryIO, original_filename: str, folder: str = "uploads") -> str:
     root = get_storage_root() / folder
     root.mkdir(parents=True, exist_ok=True)

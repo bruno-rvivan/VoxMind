@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import logging
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -14,16 +15,18 @@ from app.models.transcript import Transcript
 from app.models.user import User
 from app.pipelines.language import analyze_transcript
 from app.pipelines.synthesis import synthesize_report
+from app.pipelines.transcription import NoSpeechDetectedError, transcribe_media
 from app.schemas.analysis import (
     AnalysisListItem,
     AnalysisReportRequest,
     AnalysisReportResponse,
     CreateAnalysisRequest,
 )
-from app.services.storage import save_uploaded_file
+from app.services.storage import get_uploaded_file_path, save_uploaded_file
 
 
 router = APIRouter(prefix="/api/v1/analyses", tags=["analyses"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=AnalysisListItem, status_code=status.HTTP_201_CREATED)
@@ -101,36 +104,100 @@ def generate_report(
 		)
 
 	segments = payload.segments
+	transcript_language = payload.language or analysis.language
+	transcript_provider = "voxmind-local"
+	if not segments:
+		try:
+			media_path = get_uploaded_file_path(analysis.storage_key)
+		except ValueError as exc:
+			raise HTTPException(
+				status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+				detail="O caminho do vídeo associado à análise é inválido.",
+			) from exc
+		if not media_path.is_file():
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail="O arquivo de vídeo desta análise não foi encontrado.",
+			)
+
+		analysis.status = "processing"
+		session.commit()
+		try:
+			segments, detected_language = transcribe_media(media_path, transcript_language)
+		except NoSpeechDetectedError as exc:
+			analysis.status = "failed"
+			session.commit()
+			raise HTTPException(
+				status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+				detail=str(exc),
+			) from exc
+		except Exception as exc:
+			analysis.status = "failed"
+			session.commit()
+			logger.exception("Falha ao transcrever a mídia da análise %s", analysis.id)
+			raise HTTPException(
+				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+				detail="Não foi possível transcrever o vídeo. Tente novamente.",
+			) from exc
+
+		transcript_language = transcript_language or detected_language
+		transcript_provider = "faster-whisper"
+
 	metrics = analyze_transcript(segments)
 	report_payload = synthesize_report(metrics)
 	text = " ".join(segment["text"] if isinstance(segment, dict) else segment.text for segment in segments)
-	transcript = Transcript(
-		analysis_id=analysis.id,
-		text=text,
-		segments_json=[
-			segment.model_dump() if hasattr(segment, "model_dump") else segment
-			for segment in segments
-		],
-		language=payload.language or analysis.language,
-		provider="voxmind-local",
+	segments_json = [
+		segment.model_dump() if hasattr(segment, "model_dump") else segment
+		for segment in segments
+	]
+	new_records = []
+	transcript = session.scalar(
+		select(Transcript).where(Transcript.analysis_id == analysis.id)
 	)
-	analysis_metric = AnalysisMetric(
-		analysis_id=analysis.id,
-		category="language",
-		metrics_json=metrics.model_dump(mode="json"),
+	if transcript is None:
+		transcript = Transcript(analysis_id=analysis.id)
+		new_records.append(transcript)
+	transcript.text = text
+	transcript.segments_json = segments_json
+	transcript.language = transcript_language
+	transcript.provider = transcript_provider
+
+	analysis_metric = session.scalar(
+		select(AnalysisMetric).where(
+			AnalysisMetric.analysis_id == analysis.id,
+			AnalysisMetric.category == "language",
+		)
 	)
-	report = Report(
-		analysis_id=analysis.id,
-		overall_score=report_payload["overall_score"],
-		report_json={
-			"summary": report_payload["summary"],
-			"highlights": report_payload["highlights"],
-			"metrics": metrics.model_dump(mode="json"),
-		},
-		model_name="voxmind-language",
-		prompt_version="v1",
-	)
-	session.add_all([transcript, analysis_metric, report])
+	if analysis_metric is None:
+		analysis_metric = AnalysisMetric(
+			analysis_id=analysis.id,
+			category="language",
+			metrics_json={},
+		)
+		new_records.append(analysis_metric)
+	analysis_metric.metrics_json = metrics.model_dump(mode="json")
+
+	report = session.scalar(select(Report).where(Report.analysis_id == analysis.id))
+	if report is None:
+		report = Report(
+			analysis_id=analysis.id,
+			overall_score=report_payload["overall_score"],
+			report_json={},
+			model_name="voxmind-language",
+			prompt_version="v1",
+		)
+		new_records.append(report)
+	report.overall_score = report_payload["overall_score"]
+	report.report_json = {
+		"summary": report_payload["summary"],
+		"highlights": report_payload["highlights"],
+		"metrics": metrics.model_dump(mode="json"),
+	}
+	report.model_name = transcript_provider
+	report.prompt_version = "v1"
+	session.add_all(new_records)
+	analysis.status = "completed"
+	analysis.completed_at = datetime.now(UTC)
 	session.commit()
 	session.refresh(report)
 

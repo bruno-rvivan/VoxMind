@@ -14,6 +14,9 @@ from app.core.security import create_access_token
 from app.db.session import get_db
 from app.main import app
 from app.models.analysis import Analysis
+from app.models.analysis_metric import AnalysisMetric
+from app.models.report import Report
+from app.models.transcript import Transcript
 from app.models.user import User
 from app.services.users import DuplicateUserError
 
@@ -404,6 +407,8 @@ def test_generate_report_returns_summary_and_score(
 
     class FakeSession:
         def scalar(self, statement) -> Analysis:
+            if statement.column_descriptions[0]["entity"] is not Analysis:
+                return None
             compiled = statement.compile()
             assert current_user.id in compiled.params.values()
             assert analysis.id in compiled.params.values()
@@ -447,6 +452,101 @@ def test_generate_report_returns_summary_and_score(
     assert 0 <= payload["overall_score"] <= 100
     assert payload["summary"]
     assert payload["highlights"]
+
+
+def test_generate_report_transcribes_uploaded_video(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    current_user = User(
+        id=uuid4(),
+        name="Current user",
+        email="current@example.com",
+        password_hash="not-returned",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    analysis = Analysis(
+        id=uuid4(),
+        user_id=current_user.id,
+        title="Apresentação interna",
+        status="queued",
+        storage_key="uploads/presentation.mp4",
+        original_filename="presentation.mp4",
+        created_at=datetime.now(UTC),
+    )
+    media_path = tmp_path / "uploads" / "presentation.mp4"
+    media_path.parent.mkdir()
+    media_path.touch()
+    persisted: list[object] = []
+    transcript = Transcript(
+        analysis_id=analysis.id,
+        text="",
+        segments_json=[],
+        language=None,
+        provider="voxmind-local",
+    )
+    analysis_metric = AnalysisMetric(
+        analysis_id=analysis.id,
+        category="language",
+        metrics_json={"word_count": 0},
+    )
+    report = Report(
+        analysis_id=analysis.id,
+        overall_score=100,
+        report_json={"summary": "vazio", "highlights": [], "metrics": {}},
+        model_name="voxmind-language",
+        prompt_version="v1",
+    )
+
+    class FakeSession:
+        def scalar(self, statement):
+            entity = statement.column_descriptions[0]["entity"]
+            return {
+                Analysis: analysis,
+                Transcript: transcript,
+                AnalysisMetric: analysis_metric,
+                Report: report,
+            }.get(entity)
+
+        def add_all(self, objects: list[object]) -> None:
+            persisted.extend(objects)
+
+        def commit(self) -> None:
+            return None
+
+        def refresh(self, obj: object) -> None:
+            return None
+
+    def fake_db():
+        yield FakeSession()
+
+    def fake_transcribe(path: Path, language: str | None):
+        assert path == media_path
+        assert language is None
+        return ([{"start": 0.2, "end": 1.7, "text": "Olá, mundo."}], "pt")
+
+    monkeypatch.setattr("app.services.storage.get_storage_root", lambda: tmp_path)
+    monkeypatch.setattr(analyses, "transcribe_media", fake_transcribe)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        dependencies.get_current_user,
+        lambda: current_user,
+    )
+    monkeypatch.setitem(app.dependency_overrides, get_db, fake_db)
+
+    response = client.post(f"/api/v1/analyses/{analysis.id}/report", json={})
+
+    assert response.status_code == 200
+    assert response.json()["metrics"]["word_count"] == 2
+    assert analysis.status == "completed"
+    assert transcript.provider == "faster-whisper"
+    assert transcript.language == "pt"
+    assert transcript.segments_json == [{"start": 0.2, "end": 1.7, "text": "Olá, mundo."}]
+    assert analysis_metric.metrics_json["word_count"] == 2
+    assert report.report_json["metrics"]["word_count"] == 2
+    assert not persisted
 
 
 def test_get_analysis_returns_owned_analysis(

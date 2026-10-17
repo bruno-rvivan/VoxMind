@@ -119,6 +119,25 @@ export async function getAnalysisReport(analysisId: string): Promise<AnalysisRep
   return request<AnalysisReport>(`/api/v1/analyses/${analysisId}/report`);
 }
 
+export async function generateAnalysisReport(
+  analysisId: string,
+  input: { segments: Array<{ start: number; end: number; text: string }>; language?: string },
+): Promise<AnalysisReport> {
+  return request<AnalysisReport>(`/api/v1/analyses/${analysisId}/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function transcribeAndGenerateReport(analysisId: string): Promise<AnalysisReport> {
+  return request<AnalysisReport>(`/api/v1/analyses/${analysisId}/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+}
+
 export async function uploadAnalysis(formData: FormData): Promise<AnalysisItem> {
   const token = localStorage.getItem('voxmind_token');
   const response = await fetch(`${API_BASE_URL}/api/v1/analyses/upload`, {

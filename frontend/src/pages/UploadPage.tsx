@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { uploadAnalysis } from '../services/api';
+import { AnalysisItem, uploadAnalysis } from '../services/api';
 
 export default function UploadPage() {
   const navigate = useNavigate();
@@ -30,8 +30,10 @@ export default function UploadPage() {
       formData.append('language', form.language);
       formData.append('analysis_goal', form.analysis_goal);
 
-      await uploadAnalysis(formData);
-      navigate('/history');
+      const analysis: AnalysisItem = await uploadAnalysis(formData);
+      navigate(`/analysis?analysisId=${analysis.id}`, {
+        state: { analysisId: analysis.id, autoTranscribe: true },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar a análise.');
     } finally {

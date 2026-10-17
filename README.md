@@ -56,6 +56,8 @@ npm run dev -- --port 5175
 
 Abra <http://localhost:5175>. O frontend usa a API em `http://localhost:8000` por padrão. O Vite pode escolher outra porta se `5175` já estiver ocupada; nesse caso, use o endereço mostrado no terminal.
 
+Ao abrir uma análise sem relatório, o VoxMind transcreve o áudio do vídeo com `faster-whisper` (modelo `tiny`, CPU) e usa os segmentos com timestamps para gerar as métricas. O primeiro processamento baixa o modelo do Hugging Face e pode levar alguns minutos; configure `VOXMIND_WHISPER_MODEL` antes de iniciar o backend para escolher outro modelo. Vídeos precisam conter uma faixa de áudio. Planos gratuitos com pouca memória podem não conseguir executar o modelo; para transcrição automática, prefira rodar localmente ou usar um servidor com memória suficiente.
+
 ### Testes
 
 Com o ambiente virtual do backend ativado:

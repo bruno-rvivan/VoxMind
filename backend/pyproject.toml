@@ -9,8 +9,10 @@ description = "Backend for the VoxMind speech analysis application"
 requires-python = ">=3.10"
 dependencies = [
 	"alembic>=1.13,<2",
+	"av>=14,<15",
 	"email-validator>=2,<3",
 	"fastapi>=0.115,<1",
+	"faster-whisper>=1.1,<2",
 	"PyJWT>=2.9,<3",
 	"psycopg[binary]>=3.2,<4",
 	"python-dotenv>=1,<2",

@@ -32,6 +32,33 @@ export type LoginResponse = {
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+function getErrorMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== 'object' || !('detail' in payload)) {
+    return fallback;
+  }
+
+  const { detail } = payload;
+  if (typeof detail === 'string') {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    for (const item of detail) {
+      if (!item || typeof item !== 'object' || !('msg' in item) || typeof item.msg !== 'string') {
+        continue;
+      }
+
+      if (item.msg === 'String should have at least 8 characters') {
+        return 'A senha precisa ter pelo menos 8 caracteres.';
+      }
+
+      return item.msg;
+    }
+  }
+
+  return fallback;
+}
+
 function getAuthHeader(): HeadersInit | undefined {
   const token = localStorage.getItem('voxmind_token');
   return token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -58,11 +85,7 @@ async function request<T>(
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const details = payload && typeof payload === 'object' ? payload : { detail: 'Erro na requisição' };
-    const message = 'detail' in details && typeof details.detail === 'string'
-      ? details.detail
-      : 'Erro na requisição';
-    throw new Error(message);
+    throw new Error(getErrorMessage(payload, 'Erro na requisição'));
   }
 
   return payload as T;
@@ -106,11 +129,7 @@ export async function uploadAnalysis(formData: FormData): Promise<AnalysisItem> 
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const details = payload && typeof payload === 'object' ? payload : { detail: 'Erro no upload' };
-    const message = 'detail' in details && typeof details.detail === 'string'
-      ? details.detail
-      : 'Erro no upload';
-    throw new Error(message);
+    throw new Error(getErrorMessage(payload, 'Erro no upload'));
   }
 
   return payload as AnalysisItem;

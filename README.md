@@ -18,4 +18,58 @@ O disco `/var/data` preserva arquivos enviados entre deploys. A base local SQLit
 
 ## Desenvolvimento local
 
-Consulte `docker-compose.yml` para iniciar o PostgreSQL. No backend, defina `DATABASE_URL` e `JWT_SECRET_KEY` (com pelo menos 32 caracteres), instale o projeto com `pip install -e '.[dev]'` e execute `uvicorn app.main:app --reload`. No frontend, use `npm ci` e `npm run dev`.
+### Requisitos
+
+- Python 3.10 ou superior
+- Node.js 20 e npm
+
+Não é necessário instalar Docker ou PostgreSQL para desenvolvimento: os passos abaixo usam SQLite e salvam o banco em `storage/voxmind.db`.
+
+### Backend
+
+No terminal 1, a partir da raiz do repositório:
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e '.[dev]'
+mkdir -p ../storage
+export DATABASE_URL="sqlite:///../storage/voxmind.db"
+export JWT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
+
+Mantenha esse terminal aberto. A chave gerada precisa continuar definida nesse terminal para a API. A documentação interativa fica em <http://localhost:8000/docs> e o health check em <http://localhost:8000/health>.
+
+### Frontend
+
+No terminal 2, a partir da raiz do repositório:
+
+```bash
+cd frontend
+npm ci
+npm run dev -- --port 5175
+```
+
+Abra <http://localhost:5175>. O frontend usa a API em `http://localhost:8000` por padrão. O Vite pode escolher outra porta se `5175` já estiver ocupada; nesse caso, use o endereço mostrado no terminal.
+
+### Testes
+
+Com o ambiente virtual do backend ativado:
+
+```bash
+cd backend
+pytest -q
+```
+
+Para verificar o build de produção do frontend:
+
+```bash
+cd frontend
+npm run build
+```
+
+No cadastro, a senha deve ter pelo menos 8 caracteres. Para usar PostgreSQL local em vez do SQLite, consulte `docker-compose.yml` e configure `DATABASE_URL` com a URL do banco antes de executar as migrações.

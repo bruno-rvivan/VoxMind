@@ -56,6 +56,7 @@ export default function LoginPage() {
             <input
               type="email"
               placeholder="seu@email.com"
+              required
               value={loginData.email}
               onChange={(event) => setLoginData((current) => ({ ...current, email: event.target.value }))}
             />
@@ -65,6 +66,7 @@ export default function LoginPage() {
             <input
               type="password"
               placeholder="••••••••"
+              required
               value={loginData.password}
               onChange={(event) => setLoginData((current) => ({ ...current, password: event.target.value }))}
             />
@@ -83,6 +85,7 @@ export default function LoginPage() {
             <input
               type="text"
               placeholder="Seu nome"
+              required
               value={registerData.name}
               onChange={(event) => setRegisterData((current) => ({ ...current, name: event.target.value }))}
             />
@@ -92,6 +95,7 @@ export default function LoginPage() {
             <input
               type="email"
               placeholder="seu@email.com"
+              required
               value={registerData.email}
               onChange={(event) => setRegisterData((current) => ({ ...current, email: event.target.value }))}
             />
@@ -101,6 +105,8 @@ export default function LoginPage() {
             <input
               type="password"
               placeholder="Crie uma senha"
+              minLength={8}
+              required
               value={registerData.password}
               onChange={(event) => setRegisterData((current) => ({ ...current, password: event.target.value }))}
             />
